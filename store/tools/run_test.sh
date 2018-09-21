@@ -16,14 +16,14 @@ trap '{
 }' INT
 
 # Paths to source code and logfiles.
-srcdir="/homes/sys/naveenks/Research/Tapir"
-logdir="/biggerraid/users/naveenks/tapir"
+srcdir="/home/xiaoniu.sxn/tapir"
+logdir="/home/xiaoniu.sxn/tapirlog"
 
 # Machines on which replicas are running.
 replicas=("breakout" "pitfall" "qbert")
 
 # Machines on which clients are running.
-clients=("spyhunter")
+clients=("localhost")
 
 client="benchClient"    # Which client (benchClient, retwisClient, etc)
 store="tapirstore"      # Which store (strongstore, weakstore, tapirstore)
@@ -59,19 +59,25 @@ echo "Mode: $mode"
 
 # Generate keys to be used in the experiment.
 echo "Generating random keys.."
+echo "    python key_generator.py $nkeys > keys"
 python key_generator.py $nkeys > keys
 
 
 # Start all replicas and timestamp servers
 echo "Starting TimeStampServer replicas.."
+# echo "$srcdir/store/tools/start_replica.sh tss $srcdir/store/tools/shard.tss.config \\
+#   \"$srcdir/timeserver/timeserver\" $logdir"
+
 $srcdir/store/tools/start_replica.sh tss $srcdir/store/tools/shard.tss.config \
   "$srcdir/timeserver/timeserver" $logdir
 
 for ((i=0; i<$nshard; i++))
 do
   echo "Starting shard$i replicas.."
+  # echo "$srcdir/store/tools/start_replica.sh shard$i $srcdir/store/tools/shard$i.config \\
+  #   \"$srcdir/store/$store/server -m $mode -f $srcdir/store/tools/keys -k $nkeys -e $err -s $skew\" $logdir"
   $srcdir/store/tools/start_replica.sh shard$i $srcdir/store/tools/shard$i.config \
-    "$srcdir/store/$store/server -m $mode -f $srcdir/store/tools/keys -k $nkeys -e $err -s $skew" $logdir
+    "$srcdir/store/$store/server -m $mode -f $srcdir/store/tools/keys -k $nkeys" $logdir
 done
 
 
@@ -84,6 +90,10 @@ echo "Running the client(s)"
 count=0
 for host in ${clients[@]}
 do
+  # echo "ssh $host \"$srcdir/store/tools/start_client.sh \\\"$srcdir/store/benchmark/$client \\
+  # -c $srcdir/store/tools/shard -N $nshard -f $srcdir/store/tools/keys \\
+  # -d $rtime -l $tlen -w $wper -k $nkeys -m $mode -e $err -s $skew -z $zalpha\\\" \\
+  # $count $nclient $logdir\""
   ssh $host "$srcdir/store/tools/start_client.sh \"$srcdir/store/benchmark/$client \
   -c $srcdir/store/tools/shard -N $nshard -f $srcdir/store/tools/keys \
   -d $rtime -l $tlen -w $wper -k $nkeys -m $mode -e $err -s $skew -z $zalpha\" \
