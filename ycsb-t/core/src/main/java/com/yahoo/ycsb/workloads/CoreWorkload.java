@@ -63,6 +63,9 @@ import java.util.Vector;
  */
 public class CoreWorkload extends Workload
 {
+    public int cnt = 0;
+    public long total1 = 0;
+    public long total2 = 0;
 
 	/**
 	 * The name of the database table to run queries against.
@@ -469,12 +472,26 @@ public class CoreWorkload extends Workload
 	 */
 	public boolean doInsert(DB db, Object threadstate) throws WorkloadException
 	{
+
+		long st1=System.nanoTime();
 		int keynum=keysequence.nextInt();
 		String dbkey = buildKeyName(keynum);
+		long st2=System.nanoTime();
+        cnt++;
+        total1 += st2-st1;
 		HashMap<String, ByteIterator> values = buildValues();
+		long st3=System.nanoTime();
 		if (db.insert(table,dbkey,values) == 0) {
+			long st4=System.nanoTime();
+            total2 += st4-st3;
+            if ((cnt%10000) == 0) {
+                System.err.println("1:" + (total1/cnt) + ", 2:" + (total2/cnt) + ", cnt:" + cnt);
+            }
+			// System.err.println("1:" + (st2-st1) + ", 2:" + (st3-st2) + ", 3:" + (st4-st3) + ", 4:" + (st5-st4));
 			return true;
 		} else {
+            long st4=System.nanoTime();
+            total2 += st4-st3;
 			return false;
 		}
 	}

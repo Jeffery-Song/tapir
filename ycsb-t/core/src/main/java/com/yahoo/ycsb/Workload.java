@@ -83,6 +83,7 @@ public abstract class Workload
        * @throws WorkloadException 
        */
       public abstract boolean doInsert(DB db, Object threadstate) throws WorkloadException;
+      // public abstract boolean doInsert(DB db, Object threadstate) throws WorkloadException;
       
       /**
        * Do one transaction operation. Because it will be called concurrently from multiple client threads, this 
@@ -109,6 +110,11 @@ public abstract class Workload
        * @return true if stop was requested, false otherwise.
        */
       public boolean isStopRequested() {
+        if (stopRequested.get() == true) return true;
+        else return false;
+      }
+
+      public boolean isStopRequested(Object threadstate) {
         if (stopRequested.get() == true) return true;
         else return false;
       }
