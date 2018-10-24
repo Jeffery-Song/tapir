@@ -14,24 +14,25 @@ LDFLAGS += -levent_pthreads
 ## Debian package: check
 #CHECK_CFLAGS := $(shell pkg-config --cflags check)
 #CHECK_LDFLAGS := $(shell pkg-config --cflags --libs check)
-# Debian package: libprotobuf-dev
-PROTOBUF_CFLAGS := $(shell pkg-config --cflags protobuf)
-PROTOBUF_LDFLAGS := $(shell pkg-config --cflags --libs protobuf)
-PROTOBUF_LDFLAGS := -lprotoc $(PROTOBUF_LDFLAGS)
-CFLAGS += $(PROTOBUF_CFLAGS)
-LDFLAGS += $(PROTOBUF_LDFLAGS)
-PROTOC := protoc
-# Debian package: libevent-dev
-LIBEVENT_CFLAGS := $(shell pkg-config --cflags libevent)
-LIBEVENT_LDFLAGS := $(shell pkg-config --libs libevent)
-CFLAGS += $(LIBEVENT_CFLAGS)
-LDFLAGS += $(LIBEVENT_LDFLAGS)
-# Debian package: libssl-dev
-LIBSSL_CFLAGS := $(shell pkg-config --cflags openssl)
-LIBSSL_LDFLAGS := $(shell pkg-config --libs openssl)
-CFLAGS += $(LIBSSL_CFLAGS)
-LDFLAGS += $(LIBSSL_LDFLAGS)
 
+# # Debian package: libprotobuf-dev
+# PROTOBUF_CFLAGS := $(shell pkg-config --cflags protobuf)
+# PROTOBUF_LDFLAGS := $(shell pkg-config --cflags --libs protobuf)
+# PROTOBUF_LDFLAGS := -lprotoc $(PROTOBUF_LDFLAGS)
+# CFLAGS += $(PROTOBUF_CFLAGS)
+# LDFLAGS += $(PROTOBUF_LDFLAGS)
+# PROTOC := protoc
+# # Debian package: libevent-dev
+# LIBEVENT_CFLAGS := $(shell pkg-config --cflags libevent)
+# LIBEVENT_LDFLAGS := $(shell pkg-config --libs libevent)
+# CFLAGS += $(LIBEVENT_CFLAGS)
+# LDFLAGS += $(LIBEVENT_LDFLAGS)
+# # Debian package: libssl-dev
+# LIBSSL_CFLAGS := $(shell pkg-config --cflags openssl)
+# LIBSSL_LDFLAGS := $(shell pkg-config --libs openssl)
+# CFLAGS += $(LIBSSL_CFLAGS)
+# LDFLAGS += $(LIBSSL_LDFLAGS)
+LDFLAGS += -levent -lprotobuf -lcrypto -lpthread
 
 # Google test framework. This doesn't use pkgconfig
 GTEST_DIR := /home/xiaoniu.sxn/local/googletest/googletest
