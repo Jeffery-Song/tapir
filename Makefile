@@ -8,32 +8,32 @@ LD = g++
 EXPAND = lib/tmpl/expand
 
 #CFLAGS := -g -Wall -pthread -iquote.obj/gen -Wno-uninitialized -O2 -DNASSERT
-CFLAGS := -g -Wall -pthread -iquote.obj/gen -Wno-uninitialized 
-CXXFLAGS := -g -std=c++0x
+CFLAGS := -g -Wall -pthread -iquote.obj/gen -Wno-uninitialized -D_GLIBCXX_USE_CXX11_ABI=0
+CXXFLAGS := -g -std=c++0x -D_GLIBCXX_USE_CXX11_ABI=0
 LDFLAGS := -levent_pthreads
 ## Debian package: check
 #CHECK_CFLAGS := $(shell pkg-config --cflags check)
 #CHECK_LDFLAGS := $(shell pkg-config --cflags --libs check)
 # Debian package: libprotobuf-dev
-PROTOBUF_CFLAGS := $(shell pkg-config --cflags protobuf)
-PROTOBUF_LDFLAGS := $(shell pkg-config --cflags --libs protobuf)
-CFLAGS += $(PROTOBUF_CFLAGS)
-LDFLAGS += $(PROTOBUF_LDFLAGS)
+# PROTOBUF_CFLAGS := $(shell pkg-config --cflags protobuf)
+# PROTOBUF_LDFLAGS := $(shell pkg-config --cflags --libs protobuf)
+# CFLAGS += $(PROTOBUF_CFLAGS)
+# LDFLAGS += $(PROTOBUF_LDFLAGS)
 PROTOC := protoc
 # Debian package: libevent-dev
-LIBEVENT_CFLAGS := $(shell pkg-config --cflags libevent)
-LIBEVENT_LDFLAGS := $(shell pkg-config --libs libevent)
-CFLAGS += $(LIBEVENT_CFLAGS)
-LDFLAGS += $(LIBEVENT_LDFLAGS)
+# LIBEVENT_CFLAGS := $(shell pkg-config --cflags libevent)
+# LIBEVENT_LDFLAGS := $(shell pkg-config --libs libevent)
+# CFLAGS += $(LIBEVENT_CFLAGS)
+# LDFLAGS += $(LIBEVENT_LDFLAGS)
 # Debian package: libssl-dev
-LIBSSL_CFLAGS := $(shell pkg-config --cflags openssl)
-LIBSSL_LDFLAGS := $(shell pkg-config --libs openssl)
-CFLAGS += $(LIBSSL_CFLAGS)
-LDFLAGS += $(LIBSSL_LDFLAGS)
-
+# LIBSSL_CFLAGS := $(shell pkg-config --cflags openssl)
+# LIBSSL_LDFLAGS := $(shell pkg-config --libs openssl)
+# CFLAGS += $(LIBSSL_CFLAGS)
+# LDFLAGS += $(LIBSSL_LDFLAGS)
+LDFLAGS += -levent -lprotobuf -lprotoc -lcrypto -lpthread
 
 # Google test framework. This doesn't use pkgconfig
-GTEST_DIR := /usr/src/gtest
+GTEST_DIR := /home/xiaoniu.sxn/local/googletest
 
 # Additional flags
 PARANOID = 1
