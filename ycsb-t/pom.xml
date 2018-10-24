@@ -58,7 +58,7 @@
     <module>core</module>
     <module>tapir-interface</module>
     <module>tapir</module>
-    <module>javacpp</module>
+    <!-- <module>javacpp</module> -->
   </modules>
 
   <build>

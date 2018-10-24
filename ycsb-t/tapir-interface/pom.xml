@@ -58,11 +58,13 @@
                -classpath target/classes
                -d ../libs
                -Xcompiler -std=c++0x
+               -Xcompiler -D_GLIBCXX_USE_CXX11_ABI=0
                -Xcompiler -levent
                -Xcompiler -iquote/usr/lib/jvm/default-java/include
                -Xcompiler -iquote../../
                -Xcompiler -iquote../../.obj/gen
                -Xcompiler -L../libs
+               -Xcompiler -L/home/xiaoniu.sxn/local/lib
                -Xcompiler -ltapir
              </commandlineArgs>
            </configuration>
