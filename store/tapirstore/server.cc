@@ -136,7 +136,7 @@ Server::UnloggedUpcall(const string &str1, string &str2)
 void
 Server::Sync(const std::map<opid_t, RecordEntry>& record)
 {
-    Panic("Unimplemented!");
+    // Panic("Unimplemented!");
 }
 
 std::map<opid_t, std::string>
