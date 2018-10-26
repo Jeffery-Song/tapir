@@ -33,7 +33,7 @@ updateproportion=0.5
 scanproportion=0
 insertproportion=0
 
-requestdistribution=rangezipfian
+requestdistribution=rangeseperateuniform
 dotransactions=true
 
 # insertstart=0

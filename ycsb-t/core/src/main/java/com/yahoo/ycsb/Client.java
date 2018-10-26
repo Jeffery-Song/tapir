@@ -236,6 +236,7 @@ class ClientThread extends Thread
                         if (_workload.doTransaction(_db,_workloadstate)) {
                             _db.commit();
                         } else {
+                            // System.err.println("txn fail, this is " + _threadid);
                             _db.abort();							
                         }
                     } catch (DBException e) {

@@ -41,6 +41,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Hashtable;
 import java.util.Vector;
+import java.util.Random;
 
 /**
  * The core benchmark scenario. Represents a set of clients doing simple CRUD operations. The relative 
@@ -277,11 +278,11 @@ public class RangeWorkload extends Workload
         }};
     
     // RangeGenerator keysequence;
-
+    // for ycsb load, the range index keeps++, each thread insert the entire range it gets.
     CounterGenerator rangeIndexSelector;
 
     DiscreteGenerator operationchooser;
-
+    // for ycsb run
     RangeGenerator keychooser;
 
     Generator fieldchooser;
@@ -299,6 +300,9 @@ public class RangeWorkload extends Workload
     int rangesize;
 
     String formatstring_;
+
+    String requestdistrib;
+    Random rander;
     
     protected static IntegerGenerator getFieldLengthGenerator(Properties p) throws WorkloadException{
         IntegerGenerator fieldlengthgenerator;
@@ -344,7 +348,7 @@ public class RangeWorkload extends Workload
         double scanproportion=Double.parseDouble(p.getProperty(SCAN_PROPORTION_PROPERTY,SCAN_PROPORTION_PROPERTY_DEFAULT));
         double readmodifywriteproportion=Double.parseDouble(p.getProperty(READMODIFYWRITE_PROPORTION_PROPERTY,READMODIFYWRITE_PROPORTION_PROPERTY_DEFAULT));
         recordcount=Integer.parseInt(p.getProperty(Client.RECORD_COUNT_PROPERTY));
-        String requestdistrib=p.getProperty(REQUEST_DISTRIBUTION_PROPERTY,REQUEST_DISTRIBUTION_PROPERTY_DEFAULT);
+        requestdistrib=p.getProperty(REQUEST_DISTRIBUTION_PROPERTY,REQUEST_DISTRIBUTION_PROPERTY_DEFAULT);
         int maxscanlength=Integer.parseInt(p.getProperty(MAX_SCAN_LENGTH_PROPERTY,MAX_SCAN_LENGTH_PROPERTY_DEFAULT));
         String scanlengthdistrib=p.getProperty(SCAN_LENGTH_DISTRIBUTION_PROPERTY,SCAN_LENGTH_DISTRIBUTION_PROPERTY_DEFAULT);
         
@@ -401,8 +405,7 @@ public class RangeWorkload extends Workload
         }
 
         transactioninsertkeysequence=new CounterGenerator(recordcount);
-        if (requestdistrib.compareTo("rangezipfian")==0)
-        {
+        if (requestdistrib.compareTo("rangezipfian")==0) {
             //it does this by generating a random "next key" in part by taking the modulus over the number of keys
             //if the number of keys changes, this would shift the modulus, and we don't want that to change which keys are popular
             //so we'll actually construct the scrambled zipfian generator with a keyspace that is larger than exists at the beginning
@@ -413,11 +416,11 @@ public class RangeWorkload extends Workload
             System.err.println("using range zipfian distribution");
             int opcount=Integer.parseInt(p.getProperty(Client.OPERATION_COUNT_PROPERTY));
             int expectednewkeys=(int)(((double)opcount)*insertproportion*2.0); //2 is fudge factor
-            
+            // range zipfian generator choose key from local ranges with zipfian distributions
             keychooser=new RangeZipfianGenerator(Integer.parseInt(p.getProperty(RANGE_SIZE, "0")), p.getProperty(RANGES, "").split(","));
-        }
-        else
-        {
+        } else if (requestdistrib.compareTo("rangeseperateuniform") == 0) {
+            rander = new Random();
+        } else {
             throw new WorkloadException("Unknown request distribution \""+requestdistrib+"\"");
         }
 
@@ -473,14 +476,27 @@ public class RangeWorkload extends Workload
     public Object initThread(Properties p, int mythreadid, int threadcount) throws WorkloadException
     {
         ThreadState ts = new ThreadState();
-        ts.rangeIndex_ = rangeIndexSelector.nextInt();
-        if (ts.rangeIndex_ >= ranges.length) ts.nomorekey_ = true;
+        int rangesCount = (ranges.length - mythreadid - 1 + threadcount) / threadcount;
+        ts.rangeIndexs_ = new int[rangesCount];
+        int j = 0;
+        for (int i = mythreadid; i < ranges.length; i += threadcount) {
+            // System.err.println("thread "+mythreadid+": "+ranges[i]);
+            ts.rangeIndexs_[j] = i;
+            j++;
+        }
+        assert(j == rangesCount);
+        ts.currentIndex_ = 0;
+        ts.currentOffset_ = 0;
+        ts.barriered_ = false;
+        // ts.rander = new Random();
         return ts;
     }
 
     public boolean isStopRequested(Object threadstate) {
+        ThreadState ts = (ThreadState)threadstate;
         if (isStopRequested()) return true;
-        else return ((ThreadState)threadstate).nomorekey_;
+        if (ts.currentIndex_ >= ts.rangeIndexs_.length) return true;
+        return false;
       }
     /**
      * Do one insert operation. Because it will be called concurrently from multiple client threads, this 
@@ -495,29 +511,29 @@ public class RangeWorkload extends Workload
     @Override
     public boolean doInsert(DB db, Object threadstate) throws WorkloadException
     {
-        boolean oldbarriered_ = ((ThreadState)threadstate).barriered_;
+        // backup, for barrier key, if fail, we should retry
+        ThreadState ts = (ThreadState)threadstate;
+        boolean oldbarriered_ = ts.barriered_;
+        // boolean oldbarriered_ = ((ThreadState)threadstate).barriered_;
 
         long st1=System.nanoTime();
         String dbkey;
-        if (((ThreadState)threadstate).barriered_ == false) {
-            assert(((ThreadState)threadstate).offset_ == 0);
-            ((ThreadState)threadstate).barriered_ = true;
-            dbkey = formatKey(((ThreadState)threadstate).rangeIndex_, rangesize-1) + "BARRIER";
+        if (ts.barriered_ == false) {
+            // starting a new range, first insert the tail barrier
+            assert(ts.currentOffset_ == 0);
+            ts.barriered_ = true;
+            dbkey = formatKey(ts.rangeIndexs_[ts.currentIndex_], rangesize-1) + "BARRIER";
             // System.err.println(dbkey);
-        } else if (((ThreadState)threadstate).offset_ != rangesize - 1) {
-            dbkey = formatKey(((ThreadState)threadstate).rangeIndex_, ((ThreadState)threadstate).offset_);
-            ((ThreadState)threadstate).offset_++;
+        } else if (ts.currentOffset_ != rangesize - 1) {
+            // the key to insert it a non-tail key in a range, just insert it
+            dbkey = formatKey(ts.rangeIndexs_[ts.currentIndex_], ts.currentOffset_);
+            ts.currentOffset_++;
         } else {
-            dbkey = formatKey(((ThreadState)threadstate).rangeIndex_, ((ThreadState)threadstate).offset_);
-            if (((ThreadState)threadstate).offset_ == rangesize - 1) {
-                int rangeIdx = rangeIndexSelector.nextInt();
-                if (rangeIdx >= ranges.length) {
-                    ((ThreadState)threadstate).nomorekey_ = true;
-                }
-                ((ThreadState)threadstate).offset_ = 0;
-                ((ThreadState)threadstate).rangeIndex_ = rangeIdx;
-                ((ThreadState)threadstate).barriered_ = false;
-            }
+            // the key to insert is the tail of the current range, assign the next range
+            dbkey = formatKey(ts.rangeIndexs_[ts.currentIndex_], ts.currentOffset_);
+            ts.currentIndex_++;
+            ts.currentOffset_ = 0;
+            ts.barriered_ = false;
         }
         // System.err.println(dbkey);
         // String dbkey = keysequence.nextString();
@@ -538,7 +554,7 @@ public class RangeWorkload extends Workload
             long st4=System.nanoTime();
             total2 += st4-st3;
             if (oldbarriered_ == false) {
-                ((ThreadState)threadstate).barriered_ = false;
+                ts.barriered_ = false;
             }
             return false;
         }
@@ -555,28 +571,28 @@ public class RangeWorkload extends Workload
     {
         boolean ret = true;
         long st=System.nanoTime();
-
+        ThreadState ts = (ThreadState)threadstate;
         String op=operationchooser.nextString();
 
         if (op.compareTo("READ")==0)
         {
-            ret = doTransactionRead(db);
+            ret = doTransactionRead(db, ts);
         }
         else if (op.compareTo("UPDATE")==0)
         {
-            ret = doTransactionUpdate(db);
+            ret = doTransactionUpdate(db, ts);
         }
         else if (op.compareTo("INSERT")==0)
         {
-            ret = doTransactionInsert(db);
+            ret = doTransactionInsert(db, ts);
         }
         else if (op.compareTo("SCAN")==0)
         {
-            ret = doTransactionScan(db);
+            ret = doTransactionScan(db, ts);
         }
         else
         {
-            ret = doTransactionReadModifyWrite(db);
+            ret = doTransactionReadModifyWrite(db, ts);
         }
         
         long en = System.nanoTime();
@@ -589,17 +605,22 @@ public class RangeWorkload extends Workload
         return ret;
     }
 
-    String nextKey() {
+    String nextKey(ThreadState ts) {
+        if (requestdistrib.compareTo("rangeseperateuniform") == 0) {
+            int rangeIdx = ts.rangeIndexs_[rander.nextInt(ts.rangeIndexs_.length)];
+            int offset = rander.nextInt(rangesize);
+            return formatKey(rangeIdx, offset);
+        }
         String key = keychooser.nextString();
         // System.out.println(key);
         return key;
     }
 
-    public boolean doTransactionRead(DB db)
+    public boolean doTransactionRead(DB db, ThreadState ts)
     {
         //choose a random key
         
-        String keyname = nextKey();
+        String keyname = nextKey(ts);
         
         HashSet<String> fields=null;
 
@@ -615,11 +636,11 @@ public class RangeWorkload extends Workload
         return db.read(table,keyname,fields,new HashMap<String,ByteIterator>()) == 0;
     }
     
-    public boolean doTransactionReadModifyWrite(DB db)
+    public boolean doTransactionReadModifyWrite(DB db, ThreadState ts)
     {
         //choose a random key
 
-        String keyname = nextKey();
+        String keyname = nextKey(ts);
 
         HashSet<String> fields=null;
 
@@ -660,11 +681,11 @@ public class RangeWorkload extends Workload
         return ret;
     }
     
-    public boolean doTransactionScan(DB db)
+    public boolean doTransactionScan(DB db, ThreadState ts)
     {
         //choose a random key
 
-        String startkeyname = nextKey();
+        String startkeyname = nextKey(ts);
         
         //choose a random scan length
         int len=scanlength.nextInt();
@@ -683,11 +704,11 @@ public class RangeWorkload extends Workload
         return db.scan(table,startkeyname,len,fields,new Vector<HashMap<String,ByteIterator>>()) == 0;
     }
 
-    public boolean doTransactionUpdate(DB db)
+    public boolean doTransactionUpdate(DB db, ThreadState ts)
     {
         //choose a random key
 
-        String keyname = nextKey();
+        String keyname = nextKey(ts);
 
         HashMap<String,ByteIterator> values;
 
@@ -705,7 +726,7 @@ public class RangeWorkload extends Workload
         return db.update(table,keyname,values) == 0;
     }
 
-    public boolean doTransactionInsert(DB db)
+    public boolean doTransactionInsert(DB db, ThreadState ts)
     {
         //choose the next key
         int keynum=transactioninsertkeysequence.nextInt();
@@ -716,15 +737,19 @@ public class RangeWorkload extends Workload
         return db.insert(table,dbkey,values) == 0;
     }
     protected class ThreadState {
-        protected int rangeIndex_ = 0;
-        protected int offset_     = 0;
+        protected int rangeIndexs_[];
+        protected int currentIndex_;
+        protected int currentOffset_;
         protected boolean barriered_ = true;
-        protected boolean nomorekey_ = false;
+        // Random rander;
+        // protected int rangeIndex_ = 0;
+        // protected int offset_     = 0;
+        // protected boolean nomorekey_ = false;
         protected ThreadState() {
-            rangeIndex_ = 0;
-            offset_ = 0;
-            barriered_ = false;
-            nomorekey_ = false;
+            // rangeIndex_ = 0;
+            // offset_ = 0;
+            // barriered_ = false;
+            // nomorekey_ = false;
         }
     }
 }
